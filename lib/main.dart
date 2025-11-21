@@ -17,6 +17,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: const TimerListPage(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
@@ -120,7 +121,7 @@ class _TimerListPageState extends State<TimerListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        backgroundColor: Color(0xFF183f78),
         title: const Text('My Timers'),
       ),
       body: _savedTimers.isEmpty
@@ -503,15 +504,24 @@ class TimerRunningPage extends StatefulWidget {
 }
 
 class _TimerRunningPageState extends State<TimerRunningPage> {
+  Timer? _clockTimer;
+
   @override
   void initState() {
     super.initState();
     widget.savedTimer.addListener(_onTimerUpdate);
+    // Update the clock every second
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
   @override
   void dispose() {
     widget.savedTimer.removeListener(_onTimerUpdate);
+    _clockTimer?.cancel();
     super.dispose();
   }
 
@@ -533,85 +543,131 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.savedTimer.name),
+        backgroundColor: Color(0xFF183f78),
+        title: Text(
+            widget.savedTimer.name,
+          style: TextStyle(
+            color: Colors.white,
+          ),
+        ),
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              _formatTime(widget.savedTimer.remainingSeconds),
-              style: const TextStyle(
-                fontSize: 72,
-                fontWeight: FontWeight.bold,
-              ),
+      body: Stack(
+        children: [
+          // Background image
+          Positioned.fill(
+            child: Image.asset(
+              'images/background_img.png',
+              fit: BoxFit.cover,
             ),
-            const SizedBox(height: 16),
-            Text(
-              _formatCurrentDateTime(),
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
+          ),
+          // Dark overlay
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.7),
             ),
-            const SizedBox(height: 48),
-            if (isScheduled && widget.savedTimer.scheduledTime != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 24),
-                child: Text(
-                  'Scheduled to start at ${_formatScheduledTimeDisplay(widget.savedTimer.scheduledTime!)}',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.orange[700],
-                    fontStyle: FontStyle.italic,
+          ),
+          // Content
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'images/logo.png',
+                  width: 180,
+                ),
+                Text(
+                  _formatTime(widget.savedTimer.remainingSeconds),
+                  style: const TextStyle(
+                    fontSize: 200,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
-              ),
-            // Only show buttons if timer was NOT started by schedule
-            if (!wasScheduledStart)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: widget.savedTimer.isRunning ? null : () => widget.savedTimer.start(),
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('Start'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 16,
+                const SizedBox(height: 16),
+                Text(
+                  _formatCurrentDate(),
+                  style: TextStyle(
+                    fontSize: 24,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _formatCurrentTime(),
+                  style: TextStyle(
+                    fontSize: 36,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 48),
+                if (isScheduled && widget.savedTimer.scheduledTime != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 24),
+                    child: Text(
+                      'Scheduled to start at ${_formatScheduledTimeDisplay(widget.savedTimer.scheduledTime!)}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.orange[300],
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  ElevatedButton.icon(
-                    onPressed: widget.savedTimer.isRunning ? () => widget.savedTimer.pause() : null,
-                    icon: const Icon(Icons.pause),
-                    label: const Text('Pause'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 16,
+                // Only show buttons if timer was NOT started by schedule
+                if (!wasScheduledStart)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: widget.savedTimer.isRunning ? null : () => widget.savedTimer.start(),
+                        icon: const Icon(Icons.play_arrow),
+                        label: const Text('Start'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 16,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  ElevatedButton.icon(
-                    onPressed: () => widget.savedTimer.reset(),
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Reset'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 16,
+                      const SizedBox(width: 16),
+                      ElevatedButton.icon(
+                        onPressed: widget.savedTimer.isRunning ? () => widget.savedTimer.pause() : null,
+                        icon: const Icon(Icons.pause),
+                        label: const Text('Pause'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 16,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 16),
+                      ElevatedButton.icon(
+                        onPressed: () => widget.savedTimer.reset(),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Reset'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 16,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-          ],
-        ),
+                Text(
+                  "Powered by NSU IT",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Monospace',
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -632,7 +688,7 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
     }
   }
 
-  String _formatCurrentDateTime() {
+  String _formatCurrentDate() {
     final now = DateTime.now();
 
     // Get day of week
@@ -645,5 +701,20 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
     final monthName = months[now.month - 1];
 
     return '$dayOfWeek, $monthName ${now.day}, ${now.year}';
+  }
+
+  String _formatCurrentTime() {
+    final now = DateTime.now();
+
+    // Format time in 12-hour format
+    int hour = now.hour;
+    final amPm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12;
+    if (hour == 0) hour = 12; // Convert 0 to 12 for 12 AM/PM
+
+    final minute = now.minute.toString().padLeft(2, '0');
+    final second = now.second.toString().padLeft(2, '0');
+
+    return '$hour:$minute:$second $amPm';
   }
 }
