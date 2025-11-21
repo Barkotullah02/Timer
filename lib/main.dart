@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 
 void main() {
   runApp(const MyApp());
@@ -7,119 +8,272 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Multi Timer',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const TimerHomePage(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class TimerHomePage extends StatefulWidget {
+  const TimerHomePage({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<TimerHomePage> createState() => _TimerHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _TimerHomePageState extends State<TimerHomePage> {
+  final List<TimerItem> _timers = [];
 
-  void _incrementCounter() {
+  void _addTimer() {
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      _timers.add(TimerItem());
+    });
+  }
+
+  void _removeTimer(int index) {
+    setState(() {
+      _timers[index].dispose();
+      _timers.removeAt(index);
     });
   }
 
   @override
+  void dispose() {
+    for (var timer in _timers) {
+      timer.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: const Text('Multi Timer'),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
+      body: _timers.isEmpty
+          ? const Center(
+              child: Text('No timers. Add one using the + button!'),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _timers.length,
+              itemBuilder: (context, index) {
+                return TimerWidget(
+                  timer: _timers[index],
+                  onRemove: () => _removeTimer(index),
+                );
+              },
             ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addTimer,
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+
+class TimerItem {
+  int hours = 0;
+  int minutes = 0;
+  int seconds = 0;
+  int remainingSeconds = 0;
+  Timer? _timer;
+  bool isRunning = false;
+  final ValueNotifier<int> notifier = ValueNotifier<int>(0);
+
+  void start() {
+    if (hours == 0 && minutes == 0 && seconds == 0) return;
+
+    // Prevent multiple timers from running
+    if (isRunning) return;
+
+    // Cancel any existing timer as a safety measure
+    _timer?.cancel();
+
+    if (remainingSeconds == 0) {
+      remainingSeconds = hours * 3600 + minutes * 60 + seconds;
+    }
+
+    isRunning = true;
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (remainingSeconds > 0) {
+        remainingSeconds--;
+        notifier.value = remainingSeconds;
+      } else {
+        stop();
+      }
+    });
+  }
+
+  void pause() {
+    isRunning = false;
+    _timer?.cancel();
+  }
+
+  void reset() {
+    _timer?.cancel();
+    isRunning = false;
+    remainingSeconds = 0;
+    notifier.value = 0;
+  }
+
+  void stop() {
+    _timer?.cancel();
+    isRunning = false;
+  }
+
+  void dispose() {
+    _timer?.cancel();
+    notifier.dispose();
+  }
+}
+
+class TimerWidget extends StatefulWidget {
+  final TimerItem timer;
+  final VoidCallback onRemove;
+
+  const TimerWidget({
+    super.key,
+    required this.timer,
+    required this.onRemove,
+  });
+
+  @override
+  State<TimerWidget> createState() => _TimerWidgetState();
+}
+
+class _TimerWidgetState extends State<TimerWidget> {
+  final _hoursController = TextEditingController();
+  final _minutesController = TextEditingController();
+  final _secondsController = TextEditingController();
+
+  @override
+  void dispose() {
+    _hoursController.dispose();
+    _minutesController.dispose();
+    _secondsController.dispose();
+    super.dispose();
+  }
+
+  void _setTimer() {
+    setState(() {
+      widget.timer.hours = int.tryParse(_hoursController.text) ?? 0;
+      widget.timer.minutes = int.tryParse(_minutesController.text) ?? 0;
+      widget.timer.seconds = int.tryParse(_secondsController.text) ?? 0;
+      widget.timer.reset();
+    });
+  }
+
+  String _formatTime(int totalSeconds) {
+    int h = totalSeconds ~/ 3600;
+    int m = (totalSeconds % 3600) ~/ 60;
+    int s = totalSeconds % 60;
+    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _hoursController,
+                    decoration: const InputDecoration(labelText: 'Hours'),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _minutesController,
+                    decoration: const InputDecoration(labelText: 'Minutes'),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _secondsController,
+                    decoration: const InputDecoration(labelText: 'Seconds'),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _setTimer,
+                  child: const Text('Set'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ValueListenableBuilder<int>(
+              valueListenable: widget.timer.notifier,
+              builder: (context, value, child) {
+                return Text(
+                  _formatTime(widget.timer.remainingSeconds),
+                  style: Theme.of(context).textTheme.headlineLarge,
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      widget.timer.start();
+                    });
+                  },
+                  icon: const Icon(Icons.play_arrow),
+                  label: const Text('Start'),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      widget.timer.pause();
+                    });
+                  },
+                  icon: const Icon(Icons.pause),
+                  label: const Text('Pause'),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      widget.timer.reset();
+                    });
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Reset'),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: widget.onRemove,
+                  icon: const Icon(Icons.delete),
+                  color: Colors.red,
+                ),
+              ],
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
