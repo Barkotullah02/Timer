@@ -540,6 +540,9 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
   Widget build(BuildContext context) {
     final isScheduled = widget.savedTimer.isScheduled;
     final wasScheduledStart = widget.savedTimer.wasScheduledStart;
+    final progress = widget.savedTimer.totalSeconds > 0
+        ? 1.0 - (widget.savedTimer.remainingSeconds / widget.savedTimer.totalSeconds)
+        : 0.0;
 
     return Scaffold(
       appBar: AppBar(
@@ -667,6 +670,18 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
               ],
             ),
           ),
+          // Progress bar at the bottom
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.white,
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF071642)),
+              minHeight: 40,
+            ),
+          ),
         ],
       ),
     );
@@ -689,7 +704,8 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
   }
 
   String _formatCurrentDate() {
-    final now = DateTime.now();
+    // Get current time in UTC+6 (Dhaka timezone)
+    final now = DateTime.now().toUtc().add(const Duration(hours: 6));
 
     // Get day of week
     const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -704,7 +720,8 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
   }
 
   String _formatCurrentTime() {
-    final now = DateTime.now();
+    // Get current time in UTC+6 (Dhaka timezone)
+    final now = DateTime.now().toUtc().add(const Duration(hours: 6));
 
     // Format time in 12-hour format
     int hour = now.hour;
