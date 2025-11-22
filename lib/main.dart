@@ -603,12 +603,12 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
               Center(
                 child: Text(
                   _formatCurrentTime(),
                   style: TextStyle(
-                    fontSize: 36,
+                    fontSize: 42,
                     color: Colors.white,
                     fontWeight: FontWeight.w500,
                     height: 1.0,
@@ -628,7 +628,7 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
                     ),
                   ),
                 ),
-              const SizedBox(height: 25),
+              const SizedBox(height: 8),
               Center(
                 child: Text(
                   "Powered by NSU IT",
