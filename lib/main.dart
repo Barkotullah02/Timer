@@ -592,7 +592,7 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 20),
               Center(
                 child: Text(
                   _formatCurrentDate(),
@@ -628,6 +628,7 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
                     ),
                   ),
                 ),
+              const SizedBox(height: 8),
               Center(
                 child: Text(
                   "Powered by NSU IT",
