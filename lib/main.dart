@@ -570,32 +570,39 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
             ),
           ),
           // Content
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Image.asset(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(height: 6),
+              Center(
+                child: Image.asset(
                   'images/logo.png',
                   width: 180,
                 ),
-                Text(
+              ),
+              const SizedBox(height: 2),
+              Center(
+                child: Text(
                   _formatTime(widget.savedTimer.remainingSeconds),
                   style: const TextStyle(
-                    fontSize: 200,
+                    fontSize: 190,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: 16),
-                Text(
+              ),
+              Center(
+                child: Text(
                   _formatCurrentDate(),
                   style: TextStyle(
                     fontSize: 24,
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: Text(
                   _formatCurrentTime(),
                   style: TextStyle(
                     fontSize: 36,
@@ -603,72 +610,74 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 48),
-                if (isScheduled && widget.savedTimer.scheduledTime != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: Text(
-                      'Scheduled to start at ${_formatScheduledTimeDisplay(widget.savedTimer.scheduledTime!)}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.orange[300],
-                        fontStyle: FontStyle.italic,
-                      ),
+              ),
+              const SizedBox(height: 8),
+              if (isScheduled && widget.savedTimer.scheduledTime != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 24),
+                  child: Text(
+                    'Scheduled to start at ${_formatScheduledTimeDisplay(widget.savedTimer.scheduledTime!)}',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.orange[300],
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
-                // Only show buttons if timer was NOT started by schedule
-                if (!wasScheduledStart)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: widget.savedTimer.isRunning ? null : () => widget.savedTimer.start(),
-                        icon: const Icon(Icons.play_arrow),
-                        label: const Text('Start'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton.icon(
-                        onPressed: widget.savedTimer.isRunning ? () => widget.savedTimer.pause() : null,
-                        icon: const Icon(Icons.pause),
-                        label: const Text('Pause'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton.icon(
-                        onPressed: () => widget.savedTimer.reset(),
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Reset'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                Text(
+                ),
+              Center(
+                child: Text(
                   "Powered by NSU IT",
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Colors.white.withOpacity(0.5),
                     fontFamily: 'Monospace',
                     fontSize: 24,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-              ],
-            ),
+              ),
+              // Only show buttons if timer was NOT started by schedule
+              if (!wasScheduledStart)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: widget.savedTimer.isRunning ? null : () => widget.savedTimer.start(),
+                      icon: const Icon(Icons.play_arrow),
+                      label: const Text('Start'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 16,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: widget.savedTimer.isRunning ? () => widget.savedTimer.pause() : null,
+                      icon: const Icon(Icons.pause),
+                      label: const Text('Pause'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 16,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    ElevatedButton.icon(
+                      onPressed: () => widget.savedTimer.reset(),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Reset'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
           ),
           // Progress bar at the bottom
           Positioned(
@@ -679,7 +688,7 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
               value: progress,
               backgroundColor: Colors.white,
               valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF071642)),
-              minHeight: 40,
+              minHeight: 20,
             ),
           ),
         ],
