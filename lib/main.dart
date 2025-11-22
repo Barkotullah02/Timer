@@ -573,7 +573,7 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 6),
+              const SizedBox(height: 12),
               Center(
                 child: Image.asset(
                   'images/logo.png',
@@ -588,15 +588,18 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
                     fontSize: 190,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
+                    height: 1.0,
                   ),
                 ),
               ),
+              const SizedBox(height: 12),
               Center(
                 child: Text(
                   _formatCurrentDate(),
                   style: TextStyle(
                     fontSize: 24,
                     color: Colors.white,
+                    height: 1.0,
                   ),
                 ),
               ),
@@ -608,10 +611,11 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
                     fontSize: 36,
                     color: Colors.white,
                     fontWeight: FontWeight.w500,
+                    height: 1.0,
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 2),
               if (isScheduled && widget.savedTimer.scheduledTime != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 24),
