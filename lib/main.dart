@@ -633,10 +633,9 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.alarm_off,
-                size: 64,
-                color: Color(0xFF183f78),
+              Image.asset(
+                'images/nsu_logo.png',
+                width: 80,
               ),
               const SizedBox(height: 16),
               Text(
