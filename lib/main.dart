@@ -666,7 +666,19 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
           ),
         ),
       ),
-    );
+    ).then((_) {
+      // Modal was closed, no additional action needed
+    });
+
+    // Auto-close the modal after 20 seconds
+    Timer(const Duration(seconds: 20), () {
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(); // Close the modal
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(); // Go back to timer list
+        }
+      }
+    });
   }
 
   String _formatTime(int totalSeconds) {
