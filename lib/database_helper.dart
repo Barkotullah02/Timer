@@ -19,8 +19,9 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
   }
 
@@ -34,9 +35,17 @@ class DatabaseHelper {
         seconds INTEGER NOT NULL,
         scheduledTime TEXT,
         isScheduled INTEGER NOT NULL,
-        wasScheduledStart INTEGER NOT NULL
+        wasScheduledStart INTEGER NOT NULL,
+        endMessage TEXT
       )
     ''');
+  }
+
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Add endMessage column to existing tables
+      await db.execute('ALTER TABLE timers ADD COLUMN endMessage TEXT');
+    }
   }
 
   Future<int> insertTimer(Map<String, dynamic> timer) async {

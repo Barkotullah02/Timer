@@ -68,13 +68,14 @@ class _TimerListPageState extends State<TimerListPage> {
     showDialog(
       context: context,
       builder: (context) => AddTimerDialog(
-        onAdd: (hours, minutes, seconds, name, scheduledTime) async {
+        onAdd: (hours, minutes, seconds, name, scheduledTime, endMessage) async {
           final newTimer = SavedTimer(
             name: name,
             hours: hours,
             minutes: minutes,
             seconds: seconds,
             scheduledTime: scheduledTime,
+            endMessage: endMessage,
           );
           newTimer.onScheduledStart = () => _onTimerScheduledStart(newTimer);
 
@@ -221,6 +222,7 @@ class SavedTimer {
   final int minutes;
   final int seconds;
   final DateTime? scheduledTime;
+  final String? endMessage; // Custom message to show when timer ends
 
   int remainingSeconds = 0;
   Timer? _timer;
@@ -238,6 +240,7 @@ class SavedTimer {
     required this.minutes,
     required this.seconds,
     this.scheduledTime,
+    this.endMessage,
   }) {
     remainingSeconds = totalSeconds;
     if (scheduledTime != null) {
@@ -336,6 +339,7 @@ class SavedTimer {
       'scheduledTime': scheduledTime?.toIso8601String(),
       'isScheduled': isScheduled ? 1 : 0,
       'wasScheduledStart': wasScheduledStart ? 1 : 0,
+      'endMessage': endMessage,
     };
   }
 
@@ -350,6 +354,7 @@ class SavedTimer {
       scheduledTime: map['scheduledTime'] != null
           ? DateTime.parse(map['scheduledTime'] as String)
           : null,
+      endMessage: map['endMessage'] as String?,
     );
     timer.isScheduled = (map['isScheduled'] as int) == 1;
     timer.wasScheduledStart = (map['wasScheduledStart'] as int) == 1;
@@ -358,7 +363,7 @@ class SavedTimer {
 }
 
 class AddTimerDialog extends StatefulWidget {
-  final Function(int hours, int minutes, int seconds, String name, DateTime? scheduledTime) onAdd;
+  final Function(int hours, int minutes, int seconds, String name, DateTime? scheduledTime, String? endMessage) onAdd;
 
   const AddTimerDialog({super.key, required this.onAdd});
 
@@ -371,6 +376,7 @@ class _AddTimerDialogState extends State<AddTimerDialog> {
   final _hoursController = TextEditingController(text: '0');
   final _minutesController = TextEditingController(text: '0');
   final _secondsController = TextEditingController(text: '0');
+  final _endMessageController = TextEditingController();
   DateTime? _scheduledTime;
   bool _enableSchedule = false;
 
@@ -380,6 +386,7 @@ class _AddTimerDialogState extends State<AddTimerDialog> {
     _hoursController.dispose();
     _minutesController.dispose();
     _secondsController.dispose();
+    _endMessageController.dispose();
     super.dispose();
   }
 
@@ -447,7 +454,11 @@ class _AddTimerDialogState extends State<AddTimerDialog> {
       return;
     }
 
-    widget.onAdd(hours, minutes, seconds, name, _enableSchedule ? _scheduledTime : null);
+    final endMessage = _endMessageController.text.trim().isEmpty
+        ? null
+        : _endMessageController.text.trim();
+
+    widget.onAdd(hours, minutes, seconds, name, _enableSchedule ? _scheduledTime : null, endMessage);
     Navigator.pop(context);
   }
 
@@ -505,6 +516,15 @@ class _AddTimerDialogState extends State<AddTimerDialog> {
               ],
             ),
             const SizedBox(height: 16),
+            TextField(
+              controller: _endMessageController,
+              decoration: const InputDecoration(
+                labelText: 'End Message (Optional)',
+                hintText: 'Message to show when timer ends',
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 16),
             CheckboxListTile(
               title: const Text('Schedule Timer'),
               value: _enableSchedule,
@@ -560,6 +580,7 @@ class TimerRunningPage extends StatefulWidget {
 
 class _TimerRunningPageState extends State<TimerRunningPage> {
   Timer? _clockTimer;
+  bool _showEndModal = false;
 
   @override
   void initState() {
@@ -582,6 +603,71 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
 
   void _onTimerUpdate() {
     setState(() {});
+
+    // Check if timer has 1 second remaining and has an end message
+    // Show modal 1 second before timer ends to ensure visibility
+    if (widget.savedTimer.remainingSeconds == 1 &&
+        widget.savedTimer.isRunning &&
+        !_showEndModal &&
+        widget.savedTimer.endMessage != null &&
+        widget.savedTimer.endMessage!.isNotEmpty) {
+      _showEndModal = true;
+      _showTimerEndModal();
+    }
+  }
+
+  void _showTimerEndModal() {
+    final message = widget.savedTimer.endMessage!;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.alarm_off,
+                size: 64,
+                color: Color(0xFF183f78),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).pop(); // Go back to timer list
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF183f78),
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                ),
+                child: const Text(
+                  'OK',
+                  style: TextStyle(fontSize: 18, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   String _formatTime(int totalSeconds) {
@@ -624,6 +710,13 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
               color: Colors.black.withOpacity(0.7),
             ),
           ),
+          // Extra dark overlay when timer ends
+          if (_showEndModal)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withOpacity(0.5),
+              ),
+            ),
           // Content
           Column(
             crossAxisAlignment: CrossAxisAlignment.center,
