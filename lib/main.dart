@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'database_helper.dart';
 
 void main() {
   runApp(const MyApp());
@@ -31,18 +32,25 @@ class TimerListPage extends StatefulWidget {
 
 class _TimerListPageState extends State<TimerListPage> {
   final List<SavedTimer> _savedTimers = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    // Set up listeners for scheduled timers
-    _setupTimerListeners();
+    _loadTimers();
   }
 
-  void _setupTimerListeners() {
-    for (var timer in _savedTimers) {
-      timer.onScheduledStart = () => _onTimerScheduledStart(timer);
-    }
+  Future<void> _loadTimers() async {
+    final dbTimers = await DatabaseHelper.instance.getAllTimers();
+    setState(() {
+      _savedTimers.clear();
+      for (var timerMap in dbTimers) {
+        final timer = SavedTimer.fromMap(timerMap);
+        timer.onScheduledStart = () => _onTimerScheduledStart(timer);
+        _savedTimers.add(timer);
+      }
+      _isLoading = false;
+    });
   }
 
   void _onTimerScheduledStart(SavedTimer timer) {
@@ -60,16 +68,21 @@ class _TimerListPageState extends State<TimerListPage> {
     showDialog(
       context: context,
       builder: (context) => AddTimerDialog(
-        onAdd: (hours, minutes, seconds, name, scheduledTime) {
+        onAdd: (hours, minutes, seconds, name, scheduledTime) async {
+          final newTimer = SavedTimer(
+            name: name,
+            hours: hours,
+            minutes: minutes,
+            seconds: seconds,
+            scheduledTime: scheduledTime,
+          );
+          newTimer.onScheduledStart = () => _onTimerScheduledStart(newTimer);
+
+          // Save to database
+          final id = await DatabaseHelper.instance.insertTimer(newTimer.toMap());
+          newTimer.id = id;
+
           setState(() {
-            final newTimer = SavedTimer(
-              name: name,
-              hours: hours,
-              minutes: minutes,
-              seconds: seconds,
-              scheduledTime: scheduledTime,
-            );
-            newTimer.onScheduledStart = () => _onTimerScheduledStart(newTimer);
             _savedTimers.add(newTimer);
           });
         },
@@ -77,9 +90,16 @@ class _TimerListPageState extends State<TimerListPage> {
     );
   }
 
-  void _removeTimer(int index) {
+  void _removeTimer(int index) async {
+    final timer = _savedTimers[index];
+
+    // Delete from database if it has an ID
+    if (timer.id != null) {
+      await DatabaseHelper.instance.deleteTimer(timer.id!);
+    }
+
     setState(() {
-      _savedTimers[index].dispose();
+      timer.dispose();
       _savedTimers.removeAt(index);
     });
   }
@@ -124,11 +144,13 @@ class _TimerListPageState extends State<TimerListPage> {
         backgroundColor: Color(0xFF183f78),
         title: const Text('My Timers'),
       ),
-      body: _savedTimers.isEmpty
-          ? const Center(
-              child: Text('No timers. Add one using the + button!'),
-            )
-          : ListView.builder(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _savedTimers.isEmpty
+              ? const Center(
+                  child: Text('No timers. Add one using the + button!'),
+                )
+              : ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: _savedTimers.length,
               itemBuilder: (context, index) {
@@ -193,6 +215,7 @@ class _TimerListPageState extends State<TimerListPage> {
 }
 
 class SavedTimer {
+  int? id; // Database ID
   final String name;
   final int hours;
   final int minutes;
@@ -209,6 +232,7 @@ class SavedTimer {
   VoidCallback? onScheduledStart;
 
   SavedTimer({
+    this.id,
     required this.name,
     required this.hours,
     required this.minutes,
@@ -299,6 +323,37 @@ class SavedTimer {
     _timer?.cancel();
     _schedulerTimer?.cancel();
     _listeners.clear();
+  }
+
+  // Convert SavedTimer to Map for database storage
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'hours': hours,
+      'minutes': minutes,
+      'seconds': seconds,
+      'scheduledTime': scheduledTime?.toIso8601String(),
+      'isScheduled': isScheduled ? 1 : 0,
+      'wasScheduledStart': wasScheduledStart ? 1 : 0,
+    };
+  }
+
+  // Create SavedTimer from Map (database row)
+  factory SavedTimer.fromMap(Map<String, dynamic> map) {
+    final timer = SavedTimer(
+      id: map['id'] as int?,
+      name: map['name'] as String,
+      hours: map['hours'] as int,
+      minutes: map['minutes'] as int,
+      seconds: map['seconds'] as int,
+      scheduledTime: map['scheduledTime'] != null
+          ? DateTime.parse(map['scheduledTime'] as String)
+          : null,
+    );
+    timer.isScheduled = (map['isScheduled'] as int) == 1;
+    timer.wasScheduledStart = (map['wasScheduledStart'] as int) == 1;
+    return timer;
   }
 }
 
