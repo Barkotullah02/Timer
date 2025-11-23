@@ -619,15 +619,28 @@ class TimerRunningPage extends StatefulWidget {
   State<TimerRunningPage> createState() => _TimerRunningPageState();
 }
 
-class _TimerRunningPageState extends State<TimerRunningPage> {
+class _TimerRunningPageState extends State<TimerRunningPage> with SingleTickerProviderStateMixin {
   Timer? _clockTimer;
   bool _showEndModal = false;
   bool _isFullScreen = false;
+  late AnimationController _waveController;
+  late Animation<double> _waveAnimation;
 
   @override
   void initState() {
     super.initState();
     widget.savedTimer.addListener(_onTimerUpdate);
+
+    // Initialize wave animation
+    _waveController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _waveAnimation = Tween<double>(begin: -10, end: 10).animate(
+      CurvedAnimation(parent: _waveController, curve: Curves.easeInOut),
+    );
+
     // Update the clock every second
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
@@ -640,6 +653,7 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
   void dispose() {
     widget.savedTimer.removeListener(_onTimerUpdate);
     _clockTimer?.cancel();
+    _waveController.dispose();
     super.dispose();
   }
 
@@ -819,14 +833,70 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
               ),
               const SizedBox(height: 2),
               Center(
-                child: Text(
-                  _formatTime(widget.savedTimer.remainingSeconds),
-                  style: const TextStyle(
-                    fontSize: 190,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    height: 1.0,
-                  ),
+                child: Stack(
+                  children: [
+                    // Main timer text (base layer)
+                    Text(
+                      _formatTime(widget.savedTimer.remainingSeconds),
+                      style: const TextStyle(
+                        fontSize: 200,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        height: 1.0,
+                        fontFamily: 'Courier',
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    // Water fill effect overlay with wave animation
+                    AnimatedBuilder(
+                      animation: _waveAnimation,
+                      builder: (context, child) {
+                        return ClipPath(
+                          clipper: WaterWaveClipper(
+                            progress: progress,
+                            waveOffset: _waveAnimation.value,
+                          ),
+                          child: ShaderMask(
+                            shaderCallback: (Rect bounds) {
+                              return LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Color(0xFF00D4FF).withOpacity(0.8), // Bright cyan at top
+                                  Color(0xFF0099FF).withOpacity(0.9), // Blue in middle
+                                  Color(0xFF0066FF), // Deeper blue at bottom
+                                ],
+                                stops: [0.0, 0.5, 1.0],
+                              ).createShader(bounds);
+                            },
+                            child: Text(
+                              _formatTime(widget.savedTimer.remainingSeconds),
+                              style: TextStyle(
+                                fontSize: 200,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                height: 1.0,
+                                fontFamily: 'Courier',
+                                fontFeatures: [FontFeature.tabularFigures()],
+                                shadows: [
+                                  Shadow(
+                                    color: Color(0xFF00D4FF).withOpacity(0.5),
+                                    blurRadius: 20,
+                                    offset: Offset(0, 0),
+                                  ),
+                                  Shadow(
+                                    color: Color(0xFF0099FF).withOpacity(0.3),
+                                    blurRadius: 30,
+                                    offset: Offset(0, 5),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 25),
@@ -987,3 +1057,45 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
     return '$hour:$minute:$second $amPm';
   }
 }
+
+// Custom clipper for water wave effect
+class WaterWaveClipper extends CustomClipper<Path> {
+  final double progress;
+  final double waveOffset;
+
+  WaterWaveClipper({required this.progress, required this.waveOffset});
+
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    final waveHeight = 15.0; // Height of the wave curves
+    final waterLevel = size.height * (1 - progress); // Water rises from bottom
+
+    // Start from bottom left
+    path.lineTo(0, size.height);
+    path.lineTo(size.width, size.height);
+    path.lineTo(size.width, waterLevel);
+
+    // Create wave effect at the top of water
+    final waveWidth = size.width / 4;
+    for (double i = size.width; i >= 0; i -= waveWidth) {
+      path.quadraticBezierTo(
+        i - waveWidth / 2,
+        waterLevel - waveHeight + waveOffset,
+        i - waveWidth,
+        waterLevel,
+      );
+    }
+
+    path.lineTo(0, waterLevel);
+    path.close();
+
+    return path;
+  }
+
+  @override
+  bool shouldReclip(WaterWaveClipper oldClipper) {
+    return oldClipper.progress != progress || oldClipper.waveOffset != waveOffset;
+  }
+}
+
