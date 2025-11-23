@@ -39,11 +39,24 @@ class TimerListPage extends StatefulWidget {
 class _TimerListPageState extends State<TimerListPage> {
   final List<SavedTimer> _savedTimers = [];
   bool _isLoading = true;
+  bool _isFullScreen = false;
 
   @override
   void initState() {
     super.initState();
     _loadTimers();
+  }
+
+  Future<void> _toggleFullScreen() async {
+    setState(() {
+      _isFullScreen = !_isFullScreen;
+    });
+
+    if (_isFullScreen) {
+      await windowManager.setFullScreen(true);
+    } else {
+      await windowManager.setFullScreen(false);
+    }
   }
 
   Future<void> _loadTimers() async {
@@ -146,12 +159,33 @@ class _TimerListPageState extends State<TimerListPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Color(0xFF183f78),
-        title: const Text('My Timers'),
-      ),
-      body: _isLoading
+    return KeyboardListener(
+      focusNode: FocusNode(),
+      autofocus: true,
+      onKeyEvent: (KeyEvent event) {
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.f11) {
+          _toggleFullScreen();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: Color(0xFF183f78),
+          iconTheme: IconThemeData(color: Colors.white),
+          title: const Text(
+            'My Timers',
+            style: TextStyle(color: Colors.white),
+          ),
+          actions: [
+            IconButton(
+              icon: Icon(
+                _isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+              ),
+              onPressed: _toggleFullScreen,
+              tooltip: _isFullScreen ? 'Exit Fullscreen' : 'Enter Fullscreen',
+            ),
+          ],
+        ),
+        body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _savedTimers.isEmpty
               ? const Center(
@@ -216,6 +250,7 @@ class _TimerListPageState extends State<TimerListPage> {
       floatingActionButton: FloatingActionButton(
         onPressed: _addTimer,
         child: const Icon(Icons.add),
+      ),
       ),
     );
   }
@@ -726,24 +761,30 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
       child: Scaffold(
         appBar: AppBar(
           backgroundColor: Color(0xFF183f78),
+          iconTheme: IconThemeData(color: Colors.white),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          ),
           title: Text(
             widget.savedTimer.name,
-          style: TextStyle(
-            color: Colors.white,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              _isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+            style: TextStyle(
               color: Colors.white,
             ),
-            onPressed: _toggleFullScreen,
-            tooltip: _isFullScreen ? 'Exit Fullscreen' : 'Enter Fullscreen',
           ),
-        ],
-      ),
-      body: Stack(
+          actions: [
+            IconButton(
+              icon: Icon(
+                _isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+              ),
+              onPressed: _toggleFullScreen,
+              tooltip: _isFullScreen ? 'Exit Fullscreen' : 'Enter Fullscreen',
+            ),
+          ],
+        ),
+        body: Stack(
         children: [
           // Background image
           Positioned.fill(
