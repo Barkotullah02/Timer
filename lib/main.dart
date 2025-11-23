@@ -878,18 +878,18 @@ class _TimerRunningPageState extends State<TimerRunningPage> with SingleTickerPr
                                 height: 1.0,
                                 fontFamily: 'Courier',
                                 fontFeatures: [FontFeature.tabularFigures()],
-                                shadows: [
-                                  Shadow(
-                                    color: Color(0xFF00D4FF).withOpacity(0.5),
-                                    blurRadius: 20,
-                                    offset: Offset(0, 0),
-                                  ),
-                                  Shadow(
-                                    color: Color(0xFF0099FF).withOpacity(0.3),
-                                    blurRadius: 30,
-                                    offset: Offset(0, 5),
-                                  ),
-                                ],
+                                // shadows: [
+                                //   Shadow(
+                                //     color: Color(0xFF00D4FF).withOpacity(0.5),
+                                //     blurRadius: 20,
+                                //     offset: Offset(0, 0),
+                                //   ),
+                                //   Shadow(
+                                //     color: Color(0xFF0099FF).withOpacity(0.3),
+                                //     blurRadius: 30,
+                                //     offset: Offset(0, 5),
+                                //   ),
+                                // ],
                               ),
                             ),
                           ),
