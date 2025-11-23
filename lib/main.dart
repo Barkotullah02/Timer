@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'database_helper.dart';
+import 'package:window_manager/window_manager.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Initialize window manager for desktop platforms
+  await windowManager.ensureInitialized();
+
   runApp(const MyApp());
 }
 
@@ -581,6 +587,7 @@ class TimerRunningPage extends StatefulWidget {
 class _TimerRunningPageState extends State<TimerRunningPage> {
   Timer? _clockTimer;
   bool _showEndModal = false;
+  bool _isFullScreen = false;
 
   @override
   void initState() {
@@ -599,6 +606,18 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
     widget.savedTimer.removeListener(_onTimerUpdate);
     _clockTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _toggleFullScreen() async {
+    setState(() {
+      _isFullScreen = !_isFullScreen;
+    });
+
+    if (_isFullScreen) {
+      await windowManager.setFullScreen(true);
+    } else {
+      await windowManager.setFullScreen(false);
+    }
   }
 
   void _onTimerUpdate() {
@@ -696,15 +715,33 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
         ? 1.0 - (widget.savedTimer.remainingSeconds / widget.savedTimer.totalSeconds)
         : 0.0;
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Color(0xFF183f78),
-        title: Text(
+    return KeyboardListener(
+      focusNode: FocusNode(),
+      autofocus: true,
+      onKeyEvent: (KeyEvent event) {
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.f11) {
+          _toggleFullScreen();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: Color(0xFF183f78),
+          title: Text(
             widget.savedTimer.name,
           style: TextStyle(
             color: Colors.white,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: Icon(
+              _isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+              color: Colors.white,
+            ),
+            onPressed: _toggleFullScreen,
+            tooltip: _isFullScreen ? 'Exit Fullscreen' : 'Enter Fullscreen',
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -856,6 +893,7 @@ class _TimerRunningPageState extends State<TimerRunningPage> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
