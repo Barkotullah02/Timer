@@ -620,12 +620,16 @@ class TimerRunningPage extends StatefulWidget {
   State<TimerRunningPage> createState() => _TimerRunningPageState();
 }
 
-class _TimerRunningPageState extends State<TimerRunningPage> with SingleTickerProviderStateMixin {
+class _TimerRunningPageState extends State<TimerRunningPage> with TickerProviderStateMixin {
   Timer? _clockTimer;
   bool _showEndModal = false;
   bool _isFullScreen = false;
   late AnimationController _waveController;
   late Animation<double> _waveAnimation;
+  late AnimationController _progressController;
+  late Animation<double> _progressAnimation;
+  double _currentProgress = 0.0;
+  double _targetProgress = 0.0;
 
   @override
   void initState() {
@@ -642,6 +646,26 @@ class _TimerRunningPageState extends State<TimerRunningPage> with SingleTickerPr
       CurvedAnimation(parent: _waveController, curve: Curves.linear),
     );
 
+    // Initialize smooth progress animation controller
+    _progressController = AnimationController(
+      duration: const Duration(milliseconds: 1000), // 1 second smooth transition
+      vsync: this,
+    );
+
+    _progressAnimation = Tween<double>(begin: 0, end: 0).animate(
+      CurvedAnimation(parent: _progressController, curve: Curves.linear),
+    )..addListener(() {
+      setState(() {
+        _currentProgress = _progressAnimation.value;
+      });
+    });
+
+    // Calculate initial progress
+    _currentProgress = widget.savedTimer.totalSeconds > 0
+        ? (widget.savedTimer.totalSeconds - widget.savedTimer.remainingSeconds) / widget.savedTimer.totalSeconds
+        : 0.0;
+    _targetProgress = _currentProgress;
+
     // Update the clock every second
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
@@ -655,6 +679,7 @@ class _TimerRunningPageState extends State<TimerRunningPage> with SingleTickerPr
     widget.savedTimer.removeListener(_onTimerUpdate);
     _clockTimer?.cancel();
     _waveController.dispose();
+    _progressController.dispose();
     super.dispose();
   }
 
@@ -671,6 +696,31 @@ class _TimerRunningPageState extends State<TimerRunningPage> with SingleTickerPr
   }
 
   void _onTimerUpdate() {
+    // Calculate new target progress
+    final newTargetProgress = widget.savedTimer.totalSeconds > 0
+        ? (widget.savedTimer.totalSeconds - widget.savedTimer.remainingSeconds) / widget.savedTimer.totalSeconds
+        : 0.0;
+
+    // Animate progress smoothly from current to target over 1 second
+    if (newTargetProgress != _targetProgress) {
+      _targetProgress = newTargetProgress;
+
+      _progressAnimation = Tween<double>(
+        begin: _currentProgress,
+        end: _targetProgress,
+      ).animate(
+        CurvedAnimation(parent: _progressController, curve: Curves.linear),
+      )..addListener(() {
+        if (mounted) {
+          setState(() {
+            _currentProgress = _progressAnimation.value;
+          });
+        }
+      });
+
+      _progressController.forward(from: 0.0);
+    }
+
     setState(() {});
 
     // Check if timer has 1 second remaining and has an end message
@@ -761,10 +811,8 @@ class _TimerRunningPageState extends State<TimerRunningPage> with SingleTickerPr
   Widget build(BuildContext context) {
     final isScheduled = widget.savedTimer.isScheduled;
     final wasScheduledStart = widget.savedTimer.wasScheduledStart;
-    // Calculate progress: 0.0 (start) to 1.0 (end)
-    final progress = widget.savedTimer.totalSeconds > 0
-        ? (widget.savedTimer.totalSeconds - widget.savedTimer.remainingSeconds) / widget.savedTimer.totalSeconds
-        : 0.0;
+    // Use the smoothly animated progress value
+    final progress = _currentProgress;
 
     return KeyboardListener(
       focusNode: FocusNode(),
@@ -823,18 +871,24 @@ class _TimerRunningPageState extends State<TimerRunningPage> with SingleTickerPr
               ),
             ),
           // Content
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const SizedBox(height: 12),
-              Center(
-                child: Image.asset(
-                  'images/logo.png',
-                  width: 180,
-                ),
+          SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: MediaQuery.of(context).size.height - kToolbarHeight,
               ),
-              const SizedBox(height: 2),
-              Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 12),
+                  Center(
+                    child: Image.asset(
+                      'images/logo.png',
+                      width: 180,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Center(
                 child: Stack(
                   children: [
                     // Main timer text (base layer)
@@ -991,10 +1045,12 @@ class _TimerRunningPageState extends State<TimerRunningPage> with SingleTickerPr
                     ),
                   ],
                 ),
-            ],
+              ],
+            ),
           ),
-          // Progress bar at the bottom
-          Positioned(
+        ),
+        // Progress bar at the bottom
+        Positioned(
             bottom: 0,
             left: 0,
             right: 0,
