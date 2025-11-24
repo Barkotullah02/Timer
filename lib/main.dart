@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'dart:math' as Math;
 import 'database_helper.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -631,14 +632,14 @@ class _TimerRunningPageState extends State<TimerRunningPage> with SingleTickerPr
     super.initState();
     widget.savedTimer.addListener(_onTimerUpdate);
 
-    // Initialize wave animation
+    // Initialize wave animation for smooth, continuous wave motion
     _waveController = AnimationController(
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 1500),
       vsync: this,
-    )..repeat(reverse: true);
+    )..repeat(); // Continuous repeat without reverse for flowing water effect
 
-    _waveAnimation = Tween<double>(begin: -10, end: 10).animate(
-      CurvedAnimation(parent: _waveController, curve: Curves.easeInOut),
+    _waveAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _waveController, curve: Curves.linear),
     );
 
     // Update the clock every second
@@ -760,8 +761,9 @@ class _TimerRunningPageState extends State<TimerRunningPage> with SingleTickerPr
   Widget build(BuildContext context) {
     final isScheduled = widget.savedTimer.isScheduled;
     final wasScheduledStart = widget.savedTimer.wasScheduledStart;
+    // Calculate progress: 0.0 (start) to 1.0 (end)
     final progress = widget.savedTimer.totalSeconds > 0
-        ? 1.0 - (widget.savedTimer.remainingSeconds / widget.savedTimer.totalSeconds)
+        ? (widget.savedTimer.totalSeconds - widget.savedTimer.remainingSeconds) / widget.savedTimer.totalSeconds
         : 0.0;
 
     return KeyboardListener(
@@ -1068,26 +1070,51 @@ class WaterWaveClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
     final path = Path();
-    final waveHeight = 15.0; // Height of the wave curves
-    final waterLevel = size.height * (1 - progress); // Water rises from bottom
 
-    // Start from bottom left
-    path.lineTo(0, size.height);
-    path.lineTo(size.width, size.height);
-    path.lineTo(size.width, waterLevel);
+    // Calculate water level - rises from bottom (0) to top (size.height)
+    // progress goes from 0.0 to 1.0 as timer counts down
+    final waterLevel = size.height * (1 - progress);
 
-    // Create wave effect at the top of water
-    final waveWidth = size.width / 4;
-    for (double i = size.width; i >= 0; i -= waveWidth) {
-      path.quadraticBezierTo(
-        i - waveWidth / 2,
-        waterLevel - waveHeight + waveOffset,
-        i - waveWidth,
-        waterLevel,
-      );
+    // If no progress yet, return empty path
+    if (progress <= 0.0) {
+      return path;
     }
 
+    // If fully filled, return full rectangle
+    if (progress >= 1.0) {
+      path.addRect(Rect.fromLTWH(0, 0, size.width, size.height));
+      return path;
+    }
+
+    // Wave parameters for realistic water motion
+    final waveHeight = 8.0; // Reduced height for subtler waves
+    final waveCount = 3.0; // Number of waves across the width
+    final waveFrequency = (waveCount * 2 * 3.14159) / size.width;
+
+    // Start from bottom-left corner
+    path.moveTo(0, size.height);
+
+    // Draw bottom edge
+    path.lineTo(size.width, size.height);
+
+    // Draw right edge up to water level
+    path.lineTo(size.width, waterLevel);
+
+    // Create smooth sinusoidal wave at the water surface
+    // The waveOffset (0 to 1) animates the wave horizontally
+    final phaseShift = waveOffset * 2 * 3.14159;
+
+    // Draw wave from right to left
+    for (double x = size.width; x >= 0; x -= 1) {
+      final y = waterLevel +
+                waveHeight * Math.sin(waveFrequency * x + phaseShift) +
+                (waveHeight * 0.3) * Math.sin(waveFrequency * x * 2.3 + phaseShift * 1.7); // Add secondary wave for more realism
+      path.lineTo(x, y);
+    }
+
+    // Close the path
     path.lineTo(0, waterLevel);
+    path.lineTo(0, size.height);
     path.close();
 
     return path;
