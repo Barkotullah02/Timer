@@ -624,6 +624,8 @@ class _TimerRunningPageState extends State<TimerRunningPage> with TickerProvider
   Timer? _clockTimer;
   bool _showEndModal = false;
   bool _isFullScreen = false;
+  bool _isPageActive = true; // Track if this page is still active
+  bool _isModalShowing = false; // Track if modal is currently visible
   late AnimationController _waveController;
   late Animation<double> _waveAnimation;
   late AnimationController _progressController;
@@ -676,11 +678,50 @@ class _TimerRunningPageState extends State<TimerRunningPage> with TickerProvider
 
   @override
   void dispose() {
+    _isPageActive = false;
     widget.savedTimer.removeListener(_onTimerUpdate);
     _clockTimer?.cancel();
     _waveController.dispose();
     _progressController.dispose();
+    // Ensure any dialog still showing is closed and flags cleared
+    _closeModalSafely();
     super.dispose();
+  }
+
+  @override
+  void deactivate() {
+    // Mark page as inactive when navigation moves away from this page
+    _isPageActive = false;
+
+    // Close the modal immediately if it's showing and clear overlay flag
+    _closeModalSafely();
+
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    // Mark page as active when navigation returns to this page
+    _isPageActive = true;
+    super.activate();
+  }
+
+  void _closeModalSafely() {
+    if (_isModalShowing) {
+      _isModalShowing = false;
+      _showEndModal = false;
+
+      // Use post-frame callback to ensure we're not in the middle of a build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        try {
+          if (mounted && Navigator.of(context, rootNavigator: true).canPop()) {
+            Navigator.of(context, rootNavigator: true).pop();
+          }
+        } catch (_) {
+          // Silently handle any navigation errors
+        }
+      });
+    }
   }
 
   Future<void> _toggleFullScreen() async {
@@ -721,81 +762,110 @@ class _TimerRunningPageState extends State<TimerRunningPage> with TickerProvider
       _progressController.forward(from: 0.0);
     }
 
-    setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
 
     // Check if timer has 1 second remaining and has an end message
     // Show modal 1 second before timer ends to ensure visibility
+    // Only show if:
+    // 1. This page is still active (not replaced by new scheduled timer)
+    // 2. Widget is still mounted
+    // 3. Modal is not already showing
+    // 4. Timer has an end message
     if (widget.savedTimer.remainingSeconds == 1 &&
         widget.savedTimer.isRunning &&
         !_showEndModal &&
+        !_isModalShowing &&
+        _isPageActive &&
+        mounted &&
         widget.savedTimer.endMessage != null &&
         widget.savedTimer.endMessage!.isNotEmpty) {
       _showEndModal = true;
-      _showTimerEndModal();
+      // Use post-frame callback to ensure we're not in the middle of a build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _isPageActive && !_isModalShowing) {
+          _showTimerEndModal();
+        }
+      });
     }
   }
 
   void _showTimerEndModal() {
+    if (!_isPageActive || !mounted || _isModalShowing) return;
+
     final message = widget.savedTimer.endMessage!;
+    _isModalShowing = true;
+    _showEndModal = true;
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset(
-                'images/nsu_logo.png',
-                width: 80,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+      useRootNavigator: true,
+      builder: (context) => WillPopScope(
+        onWillPop: () async => false, // Prevent back button from dismissing
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'images/nsu_logo.png',
+                  width: 80,
                 ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).pop(); // Go back to timer list
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF183f78),
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                const SizedBox(height: 16),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
                 ),
-                child: const Text(
-                  'OK',
-                  style: TextStyle(fontSize: 18, color: Colors.white),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    // Clear flags before navigation
+                    _isModalShowing = false;
+                    _showEndModal = false;
+
+                    // Only close the dialog, stay on the timer page
+                    try {
+                      if (Navigator.of(context, rootNavigator: true).canPop()) {
+                        Navigator.of(context, rootNavigator: true).pop();
+                      }
+                    } catch (_) {
+                      // Silently handle navigation errors
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF183f78),
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  ),
+                  child: const Text(
+                    'OK',
+                    style: TextStyle(fontSize: 18, color: Colors.white),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     ).then((_) {
-      // Modal was closed, no additional action needed
-    });
-
-    // Auto-close the modal after 20 seconds
-    Timer(const Duration(seconds: 20), () {
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop(); // Close the modal
-        if (Navigator.of(context).canPop()) {
-          Navigator.of(context).pop(); // Go back to timer list
-        }
+      // Dialog closed manually. Clear flags.
+      if (mounted) {
+        setState(() {
+          _isModalShowing = false;
+          _showEndModal = false;
+        });
       }
     });
   }
