@@ -27,7 +27,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -47,12 +47,30 @@ class DatabaseHelper {
         endMessage TEXT
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE greetings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        createdAt TEXT NOT NULL
+      )
+    ''');
   }
 
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      // Add endMessage column to existing tables
+      // v1 -> v2: add endMessage column to existing timers table
       await db.execute('ALTER TABLE timers ADD COLUMN endMessage TEXT');
+    }
+    if (oldVersion < 3) {
+      // v2 -> v3: add greetings table for the GreetingPage feature
+      await db.execute('''
+        CREATE TABLE greetings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT NOT NULL,
+          createdAt TEXT NOT NULL
+        )
+      ''');
     }
   }
 
@@ -85,9 +103,39 @@ class DatabaseHelper {
     );
   }
 
+  // ----- greetings -----
+
+  Future<int> insertGreeting(Map<String, dynamic> greeting) async {
+    final db = await database;
+    return await db.insert('greetings', greeting);
+  }
+
+  Future<List<Map<String, dynamic>>> getAllGreetings() async {
+    final db = await database;
+    return await db.query('greetings', orderBy: 'id ASC');
+  }
+
+  Future<int> deleteGreeting(int id) async {
+    final db = await database;
+    return await db.delete(
+      'greetings',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> updateGreeting(int id, Map<String, dynamic> greeting) async {
+    final db = await database;
+    return await db.update(
+      'greetings',
+      greeting,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future close() async {
     final db = await database;
     db.close();
   }
 }
-

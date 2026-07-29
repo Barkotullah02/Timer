@@ -27,13 +27,15 @@ A multi-timer Flutter application with a beautiful animated "water-fill" timer U
 
 ## Overview
 
-**Multi Timer** lets you create, save, and manage several countdown timers. Each timer can:
+**Multi Timer** lets you create, save, and manage several countdown timers **and** fullscreen greeting pages. Each timer can:
 
 - Be **started manually** with start/pause/reset controls, or
 - Be **scheduled** to auto-start at a specific date/time in the future, or
 - Optionally show a **custom end-of-timer message** in a popup modal.
 
 The running screen features a unique water-wave animation that fills up as time elapses, with a smooth animated progress bar and a live current-time / date display (in UTC+6 / Dhaka time).
+
+In addition, the **Greeting Pages** feature lets you create named fullscreen displays with a campus background, a large animated title in the center, and a live 12-hour clock in Dhaka time below it — perfect for digital signage.
 
 ---
 
@@ -48,6 +50,7 @@ The running screen features a unique water-wave animation that fills up as time 
 | Custom end message               | Show a branded modal (with NSU logo) when a scheduled/manual timer hits `00:00:01`.               |
 | Water-wave fill animation        | Animated cyan/blue liquid rising as the timer counts down.                                        |
 | Smooth progress bar              | Animated linear progress bar at the bottom of the running screen.                                 |
+| Greeting pages                   | Create beautiful fullscreen greeting pages with custom title, gradient shimmer, and live clock.   |
 | Fullscreen mode                  | Toggle fullscreen via toolbar button or `F11`.                                                    |
 | Cross-platform                   | Runs on Windows, macOS, Linux, Web, iOS, Android.                                                 |
 
@@ -55,13 +58,12 @@ The running screen features a unique water-wave animation that fills up as time 
 
 ## Screenshots / UI
 
-The project ships with three image assets in `images/`:
+The project ships with four image assets in `images/`:
 
 - `background_img.png` — dark background for the running screen.
 - `logo.png` — main app logo.
 - `nsu_logo.png` — NSU IT logo shown inside the end-of-timer modal.
-
-(Add visual screenshots here after running the app once.)
+- `greeting_page.png` — campus photo used as the background for greeting pages.
 
 ---
 
@@ -80,9 +82,9 @@ The project ships with three image assets in `images/`:
 ```
 Timer/
 ├── lib/
-│   ├── main.dart              # App entry, TimerListPage, AddTimerDialog, TimerRunningPage, SavedTimer model, WaterWaveClipper
-│   └── database_helper.dart   # SQLite singleton for the `timers` table
-├── images/                    # background_img.png, logo.png, nsu_logo.png
+│   ├── main.dart              # App entry, TimerListPage, AddTimerDialog, TimerRunningPage, SavedTimer model, WaterWaveClipper, GreetingPage, SavedGreeting model, AddGreetingDialog
+│   └── database_helper.dart   # SQLite singleton for the `timers` and `greetings` tables
+├── images/                    # background_img.png, logo.png, nsu_logo.png, greeting_page.png
 ├── test/widget_test.dart      # Default Flutter widget test
 ├── web/                       # Web build assets
 ├── windows/                   # Windows desktop runner
@@ -139,19 +141,20 @@ flutter run -d linux                     # Linux desktop
 
 ## Usage Guide
 
-1. **Launch the app** — you land on the **My Timers** list.
-2. **Tap the `+` floating action button** to add a new timer.
-3. Fill in:
+1. **Launch the app** — you land on the **My Timers** home page, which has two sections: **Timers** and **Greeting Pages**.
+2. **Add a timer** — in the Timers section, tap **Add Timer** and fill in:
    - **Timer Name** (required, e.g. "Workout")
    - **Hours / Minutes / Seconds** (all must not be `0`)
    - **End Message** (optional) — shown when the timer hits `00:00:01`
    - **Schedule Timer** (optional) — pick a future date/time
-4. **Tap Add**. The timer is saved to SQLite and shown in the list.
-5. **Tap a timer card** to open the **Timer Running** screen.
+3. **Add a greeting page** — in the Greeting Pages section, tap **Add Greeting Page**, enter a title (e.g. "Welcome to NSU"), and tap **Add**.
+4. **Tap a timer card** to open the **Timer Running** screen.
+5. **Tap a greeting card** to open the **Greeting Page** (fullscreen-ready).
 6. On the running screen:
    - Manual timers: use **Start / Pause / Reset**.
    - Scheduled timers: auto-start at the scheduled time (see fix below).
-7. **Toggle fullscreen** from the toolbar or with `F11`.
+7. On the greeting page: the campus photo is shown as a backdrop with a dark gradient overlay, the title is rendered with an animated cyan shimmer, and the live 12-hour Dhaka clock ticks below it.
+8. **Toggle fullscreen** from the toolbar or with `F11` on either screen.
 
 ---
 
@@ -165,7 +168,9 @@ flutter run -d linux                     # Linux desktop
 
 ## Data Storage
 
-All timers are persisted in a local SQLite database (`timers.db`) with the schema:
+All data is persisted in a local SQLite database (`timers.db`).
+
+### `timers` table
 
 | Column             | Type    | Notes                                          |
 |--------------------|---------|------------------------------------------------|
@@ -178,6 +183,14 @@ All timers are persisted in a local SQLite database (`timers.db`) with the schem
 | `isScheduled`      | INTEGER | `1` if the schedule is still active, else `0`  |
 | `wasScheduledStart`| INTEGER | `1` if timer was auto-launched by a schedule   |
 | `endMessage`       | TEXT    | Optional modal message shown at `00:00:01`     |
+
+### `greetings` table (schema v3+)
+
+| Column      | Type    | Notes                                       |
+|-------------|---------|---------------------------------------------|
+| `id`        | INTEGER | PRIMARY KEY AUTOINCREMENT                   |
+| `title`     | TEXT    | Greeting page title (e.g. "Welcome to NSU") |
+| `createdAt` | TEXT    | ISO-8601 timestamp of creation              |
 
 Database location depends on platform:
 
@@ -223,6 +236,7 @@ This is implemented in the `TimerListPage._loadTimers()` flow and in `SavedTimer
 
 ## Roadmap
 
+- [x] Greeting pages with custom title + live clock (added 2026-07-29).
 - [ ] Recurring scheduled timers (e.g. "every weekday at 09:00").
 - [ ] Sound + vibration when a timer ends.
 - [ ] Tray / system notification on timer end while app is minimized.

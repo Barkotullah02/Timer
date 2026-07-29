@@ -39,29 +39,19 @@ class TimerListPage extends StatefulWidget {
 
 class _TimerListPageState extends State<TimerListPage> {
   final List<SavedTimer> _savedTimers = [];
+  final List<SavedGreeting> _savedGreetings = [];
   bool _isLoading = true;
   bool _isFullScreen = false;
 
   @override
   void initState() {
     super.initState();
-    _loadTimers();
+    _loadAll();
   }
 
-  Future<void> _toggleFullScreen() async {
-    setState(() {
-      _isFullScreen = !_isFullScreen;
-    });
-
-    if (_isFullScreen) {
-      await windowManager.setFullScreen(true);
-    } else {
-      await windowManager.setFullScreen(false);
-    }
-  }
-
-  Future<void> _loadTimers() async {
+  Future<void> _loadAll() async {
     final dbTimers = await DatabaseHelper.instance.getAllTimers();
+    final dbGreetings = await DatabaseHelper.instance.getAllGreetings();
     final List<SavedTimer> overdueScheduled = [];
 
     setState(() {
@@ -80,6 +70,12 @@ class _TimerListPageState extends State<TimerListPage> {
           overdueScheduled.add(timer);
         }
       }
+
+      _savedGreetings.clear();
+      for (var greetingMap in dbGreetings) {
+        _savedGreetings.add(SavedGreeting.fromMap(greetingMap));
+      }
+
       _isLoading = false;
     });
 
@@ -93,6 +89,18 @@ class _TimerListPageState extends State<TimerListPage> {
         timer.rescheduleIfOverdue();
       }
     });
+  }
+
+  Future<void> _toggleFullScreen() async {
+    setState(() {
+      _isFullScreen = !_isFullScreen;
+    });
+
+    if (_isFullScreen) {
+      await windowManager.setFullScreen(true);
+    } else {
+      await windowManager.setFullScreen(false);
+    }
   }
 
   void _onTimerScheduledStart(SavedTimer timer) {
@@ -151,6 +159,42 @@ class _TimerListPageState extends State<TimerListPage> {
     });
   }
 
+  void _addGreeting() {
+    showDialog(
+      context: context,
+      builder: (context) => AddGreetingDialog(
+        onAdd: (title) async {
+          final newGreeting = SavedGreeting(title: title);
+          final id = await DatabaseHelper.instance.insertGreeting(newGreeting.toMap());
+          newGreeting.id = id;
+          setState(() {
+            _savedGreetings.add(newGreeting);
+          });
+        },
+      ),
+    );
+  }
+
+  void _openGreeting(SavedGreeting greeting) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        settings: RouteSettings(name: 'greeting-${greeting.id}'),
+        builder: (context) => GreetingPage(savedGreeting: greeting),
+      ),
+    );
+  }
+
+  void _removeGreeting(int index) async {
+    final greeting = _savedGreetings[index];
+    if (greeting.id != null) {
+      await DatabaseHelper.instance.deleteGreeting(greeting.id!);
+    }
+    setState(() {
+      _savedGreetings.removeAt(index);
+    });
+  }
+
   @override
   void dispose() {
     for (var timer in _savedTimers) {
@@ -164,6 +208,116 @@ class _TimerListPageState extends State<TimerListPage> {
       context,
       MaterialPageRoute(
         builder: (context) => TimerRunningPage(savedTimer: timer),
+      ),
+    );
+  }
+
+  Widget _buildTimerCard(SavedTimer timer, int index) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: () => _startTimer(timer),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      timer.name,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${timer.hours.toString().padLeft(2, '0')}:${timer.minutes.toString().padLeft(2, '0')}:${timer.seconds.toString().padLeft(2, '0')}',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    if (timer.scheduledTime != null && timer.isScheduled)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          'Scheduled: ${_formatScheduledTime(timer.scheduledTime!)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.orange[700],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: () => _removeTimer(index),
+                icon: const Icon(Icons.delete),
+                color: Colors.red,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGreetingCard(SavedGreeting greeting, int index) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: () => _openGreeting(greeting),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF183f78).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.waving_hand,
+                  color: Color(0xFF183f78),
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      greeting.title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tap to display fullscreen',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: () => _removeGreeting(index),
+                icon: const Icon(Icons.delete),
+                color: Colors.red,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -214,70 +368,96 @@ class _TimerListPageState extends State<TimerListPage> {
         ),
         body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _savedTimers.isEmpty
-              ? const Center(
-                  child: Text('No timers. Add one using the + button!'),
-                )
-              : ListView.builder(
+          : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              itemCount: _savedTimers.length,
-              itemBuilder: (context, index) {
-                final timer = _savedTimers[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: InkWell(
-                    onTap: () => _startTimer(timer),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  timer.name,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${timer.hours.toString().padLeft(2, '0')}:${timer.minutes.toString().padLeft(2, '0')}:${timer.seconds.toString().padLeft(2, '0')}',
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                                if (timer.scheduledTime != null && timer.isScheduled)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 4),
-                                    child: Text(
-                                      'Scheduled: ${_formatScheduledTime(timer.scheduledTime!)}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.orange[700],
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ---------- Timers section ----------
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Timers',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF183f78),
                           ),
-                          IconButton(
-                            onPressed: () => _removeTimer(index),
-                            icon: const Icon(Icons.delete),
-                            color: Colors.red,
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+                      TextButton.icon(
+                        onPressed: _addTimer,
+                        icon: const Icon(Icons.add, color: Color(0xFF183f78)),
+                        label: const Text(
+                          'Add Timer',
+                          style: TextStyle(color: Color(0xFF183f78)),
+                        ),
+                      ),
+                    ],
                   ),
-                );
-              },
+                  const SizedBox(height: 4),
+                  if (_savedTimers.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Text(
+                        'No timers yet. Tap "Add Timer" to create one.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.black54, fontStyle: FontStyle.italic),
+                      ),
+                    )
+                  else
+                    ..._savedTimers.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final timer = entry.value;
+                      return _buildTimerCard(timer, index);
+                    }),
+
+                  const SizedBox(height: 24),
+
+                  // ---------- Greetings section ----------
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Greeting Pages',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF183f78),
+                          ),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _addGreeting,
+                        icon: const Icon(Icons.add, color: Color(0xFF183f78)),
+                        label: const Text(
+                          'Add Greeting Page',
+                          style: TextStyle(color: Color(0xFF183f78)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  if (_savedGreetings.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Text(
+                        'No greeting pages yet. Tap "Add Greeting Page" to create one.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.black54, fontStyle: FontStyle.italic),
+                      ),
+                    )
+                  else
+                    ..._savedGreetings.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final greeting = entry.value;
+                      return _buildGreetingCard(greeting, index);
+                    }),
+                ],
+              ),
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addTimer,
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: null,
       ),
     );
   }
@@ -1319,6 +1499,491 @@ class WaterWaveClipper extends CustomClipper<Path> {
   @override
   bool shouldReclip(WaterWaveClipper oldClipper) {
     return oldClipper.progress != progress || oldClipper.waveOffset != waveOffset;
+  }
+}
+
+// =====================================================================
+// Greeting Page feature
+// =====================================================================
+
+class SavedGreeting {
+  int? id; // Database ID
+  final String title;
+  final DateTime createdAt;
+
+  SavedGreeting({
+    this.id,
+    required this.title,
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
+
+  factory SavedGreeting.fromMap(Map<String, dynamic> map) {
+    return SavedGreeting(
+      id: map['id'] as int?,
+      title: map['title'] as String,
+      createdAt: DateTime.parse(map['createdAt'] as String),
+    );
+  }
+}
+
+class AddGreetingDialog extends StatefulWidget {
+  final Function(String title) onAdd;
+
+  const AddGreetingDialog({super.key, required this.onAdd});
+
+  @override
+  State<AddGreetingDialog> createState() => _AddGreetingDialogState();
+}
+
+class _AddGreetingDialogState extends State<AddGreetingDialog> {
+  final _titleController = TextEditingController();
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    super.dispose();
+  }
+
+  void _add() {
+    final title = _titleController.text.trim();
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a greeting page title')),
+      );
+      return;
+    }
+    widget.onAdd(title);
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add Greeting Page'),
+      content: TextField(
+        controller: _titleController,
+        autofocus: true,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (_) => _add(),
+        maxLength: 80,
+        decoration: const InputDecoration(
+          labelText: 'Greeting Page Title',
+          hintText: 'e.g., Welcome to NSU',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _add,
+          child: const Text('Add'),
+        ),
+      ],
+    );
+  }
+}
+
+class GreetingPage extends StatefulWidget {
+  final SavedGreeting savedGreeting;
+
+  const GreetingPage({super.key, required this.savedGreeting});
+
+  @override
+  State<GreetingPage> createState() => _GreetingPageState();
+}
+
+class _GreetingPageState extends State<GreetingPage> with TickerProviderStateMixin {
+  Timer? _clockTimer;
+  bool _isFullScreen = false;
+
+  late final AnimationController _fadeController;
+  late final Animation<double> _fadeAnimation;
+  late final AnimationController _slideController;
+  late final Animation<Offset> _slideAnimation;
+  late final AnimationController _scaleController;
+  late final Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 1400),
+      vsync: this,
+    )..forward();
+    _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
+
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    )..forward();
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.15),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
+
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 1600),
+      vsync: this,
+    )..forward();
+    _scaleAnimation = Tween<double>(begin: 0.92, end: 1.0).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.easeOutBack),
+    );
+
+    // Tick once per second to keep the clock fresh.
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _clockTimer?.cancel();
+    _fadeController.dispose();
+    _slideController.dispose();
+    _scaleController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggleFullScreen() async {
+    setState(() {
+      _isFullScreen = !_isFullScreen;
+    });
+    if (_isFullScreen) {
+      await windowManager.setFullScreen(true);
+    } else {
+      await windowManager.setFullScreen(false);
+    }
+  }
+
+  String _formatDhakaTime12h() {
+    final dhaka = DateTime.now().toUtc().add(const Duration(hours: 6));
+    int hour = dhaka.hour;
+    final amPm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12;
+    if (hour == 0) hour = 12;
+
+    final h = hour.toString().padLeft(2, '0');
+    final m = dhaka.minute.toString().padLeft(2, '0');
+    final s = dhaka.second.toString().padLeft(2, '0');
+    return '$h:$m:$s $amPm';
+  }
+
+  String _formatDhakaDate() {
+    final dhaka = DateTime.now().toUtc().add(const Duration(hours: 6));
+    const daysOfWeek = [
+      'Monday', 'Tuesday', 'Wednesday', 'Thursday',
+      'Friday', 'Saturday', 'Sunday'
+    ];
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    final dayName = daysOfWeek[dhaka.weekday - 1];
+    final monthName = months[dhaka.month - 1];
+    return '$dayName, $monthName ${dhaka.day}, ${dhaka.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final title = widget.savedGreeting.title;
+    final mediaQuery = MediaQuery.of(context);
+
+    return KeyboardListener(
+      focusNode: FocusNode(),
+      autofocus: true,
+      onKeyEvent: (KeyEvent event) {
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.f11) {
+          _toggleFullScreen();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF183f78),
+          iconTheme: const IconThemeData(color: Colors.white),
+          title: Text(
+            title,
+            style: const TextStyle(color: Colors.white),
+          ),
+          actions: [
+            IconButton(
+              icon: Icon(
+                _isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                color: Colors.white,
+              ),
+              onPressed: _toggleFullScreen,
+              tooltip: _isFullScreen ? 'Exit Fullscreen' : 'Enter Fullscreen',
+            ),
+          ],
+        ),
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Campus photo background
+            Image.asset(
+              'images/greeting_page.png',
+              fit: BoxFit.cover,
+            ),
+            // Dark gradient overlay for legibility
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.45),
+                      Colors.black.withOpacity(0.65),
+                      Colors.black.withOpacity(0.80),
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
+                ),
+              ),
+            ),
+            // Subtle vignette glow centered behind the title
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Center(
+                  child: Container(
+                    width: mediaQuery.size.width * 0.9,
+                    height: mediaQuery.size.width * 0.9,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          const Color(0xFF00D4FF).withOpacity(0.18),
+                          const Color(0xFF0099FF).withOpacity(0.05),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.6, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Centered title + clock
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Title
+                    AnimatedBuilder(
+                      animation: Listenable.merge([
+                        _fadeAnimation,
+                        _slideAnimation,
+                        _scaleAnimation,
+                      ]),
+                      builder: (context, _) {
+                        return Opacity(
+                          opacity: _fadeAnimation.value,
+                          child: SlideTransition(
+                            position: _slideAnimation,
+                            child: ScaleTransition(
+                              scale: _scaleAnimation,
+                              child: _GradientTitle(
+                                text: title,
+                                fontSize: _titleFontSize(mediaQuery.size.width),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    // Date
+                    FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: Text(
+                        _formatDhakaDate(),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: _dateFontSize(mediaQuery.size.width),
+                          color: Colors.white.withOpacity(0.85),
+                          fontWeight: FontWeight.w400,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Live clock
+                    FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.25),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF00D4FF).withOpacity(0.25),
+                              blurRadius: 30,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          _formatDhakaTime12h(),
+                          style: TextStyle(
+                            fontSize: _clockFontSize(mediaQuery.size.width),
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Courier',
+                            letterSpacing: 4,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Footer
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 16,
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: Center(
+                  child: Text(
+                    'Powered by NSU IT',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.55),
+                      fontFamily: 'Monospace',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  double _titleFontSize(double width) {
+    if (width >= 1400) return 120;
+    if (width >= 1000) return 96;
+    if (width >= 700) return 76;
+    if (width >= 500) return 60;
+    return 44;
+  }
+
+  double _dateFontSize(double width) {
+    if (width >= 1000) return 28;
+    if (width >= 700) return 22;
+    return 18;
+  }
+
+  double _clockFontSize(double width) {
+    if (width >= 1000) return 80;
+    if (width >= 700) return 64;
+    if (width >= 500) return 52;
+    return 40;
+  }
+}
+
+/// Animated gradient title used on the GreetingPage. Renders the text with a
+/// shimmering cyan→blue→cyan gradient and a soft cyan glow.
+class _GradientTitle extends StatefulWidget {
+  final String text;
+  final double fontSize;
+
+  const _GradientTitle({required this.text, required this.fontSize});
+
+  @override
+  State<_GradientTitle> createState() => _GradientTitleState();
+}
+
+class _GradientTitleState extends State<_GradientTitle>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shimmerController;
+
+  @override
+  void initState() {
+    super.initState();
+    _shimmerController = AnimationController(
+      duration: const Duration(milliseconds: 3500),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _shimmerController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _shimmerController,
+      builder: (context, _) {
+        return ShaderMask(
+          blendMode: BlendMode.srcIn,
+          shaderCallback: (bounds) => LinearGradient(
+            begin: Alignment(-1.0 + 2.0 * _shimmerController.value, -0.3),
+            end: Alignment(1.0 + 2.0 * _shimmerController.value, 0.3),
+            colors: const [
+              Color(0xFF00D4FF),
+              Color(0xFF80E5FF),
+              Color(0xFFFFFFFF),
+              Color(0xFF80E5FF),
+              Color(0xFF00D4FF),
+            ],
+            stops: const [0.0, 0.35, 0.5, 0.65, 1.0],
+          ).createShader(bounds),
+          child: Text(
+            widget.text,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: widget.fontSize,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+              height: 1.05,
+              letterSpacing: 1.5,
+              shadows: [
+                Shadow(
+                  color: const Color(0xFF00D4FF).withOpacity(0.55),
+                  blurRadius: 30,
+                  offset: const Offset(0, 0),
+                ),
+                Shadow(
+                  color: const Color(0xFF0099FF).withOpacity(0.35),
+                  blurRadius: 50,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 

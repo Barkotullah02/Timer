@@ -58,7 +58,9 @@ scheduling semantics, and the documented bug fix.
 
 ## 3. Data model
 
-### 3.1 SQLite schema (`timers` table)
+### 3.1 SQLite schema
+
+#### `timers` table
 
 | Column             | Type    | Nullable | Notes                                         |
 |--------------------|---------|:--------:|-----------------------------------------------|
@@ -72,7 +74,17 @@ scheduling semantics, and the documented bug fix.
 | `wasScheduledStart`| INTEGER | NO       | `1` = timer was originally created with a schedule. |
 | `endMessage`       | TEXT    | YES      | Optional message shown at `remainingSeconds == 1`. |
 
-Schema version: **2**. Migration v1 → v2 only adds `endMessage`.
+#### `greetings` table (schema v3+)
+
+| Column      | Type    | Nullable | Notes                                          |
+|-------------|---------|:--------:|------------------------------------------------|
+| `id`        | INTEGER | NO       | `PRIMARY KEY AUTOINCREMENT`                    |
+| `title`     | TEXT    | NO       | Greeting page title (≤ 80 chars in dialog).    |
+| `createdAt` | TEXT    | NO       | ISO-8601 timestamp of creation.                |
+
+Schema version: **3**.
+- v1 → v2: added `endMessage` column to `timers`.
+- v2 → v3: added `greetings` table.
 
 ### 3.2 `SavedTimer` runtime model (in-memory)
 
@@ -140,16 +152,37 @@ Lifecycle:
 - When `remainingSeconds == 1` and the timer has an `endMessage`, opens a
   `barrierDismissible: false` modal with the NSU logo.
 
-### 4.4 Navigation
+### 4.4 Greeting page (`GreetingPage`)
+
+A fullscreen-friendly display showing a single greeting title and the live
+Dhaka clock. Created via **Add Greeting Page** on the home page.
+
+- **Background**: `images/greeting_page.png` (campus photo), with a
+  top→bottom dark gradient overlay (`#000000 45% → 65% → 80%`) for legibility,
+  plus a subtle radial cyan glow centered behind the title.
+- **Title**: rendered with the `_GradientTitle` widget — a `ShaderMask`
+  shimmer that animates from cyan (`#00D4FF`) → light cyan (`#80E5FF`) →
+  white → back, looping every 3.5 s, with a soft cyan glow shadow.
+- **Date**: full weekday + month + day + year (e.g. "Wednesday, July 29, 2026"),
+  18–28 px depending on screen width.
+- **Clock**: 12-hour Dhaka time (`UTC+6`) in a rounded translucent card with a
+  cyan glow shadow, ticks every second.
+- **Entrance animation**: 1.4 s fade-in combined with a 1.2 s slide-up and a
+  1.6 s `easeOutBack` scale-in.
+- **Footer**: "Powered by NSU IT" tagline in monospace at the bottom.
+- **Fullscreen**: `F11` or the toolbar icon.
+
+### 4.5 Navigation
 
 ```
 TimerListPage (home/root)
-   └── push ──> TimerRunningPage (per active scheduled timer)
+   ├── push ──> TimerRunningPage   (per timer tap or scheduled auto-launch)
+   └── push ──> GreetingPage       (per greeting tap)
 ```
 
-When a scheduled timer fires, `_onTimerScheduledStart` pushes a fresh
-`TimerRunningPage` named `timer-<id>` so it can be identified on the route
-stack. The list page remains underneath as the root.
+The list page is the root. `TimerRunningPage` is named `timer-<id>` so it can
+be identified on the route stack when auto-launched by a schedule;
+`GreetingPage` is named `greeting-<id>`.
 
 ---
 
@@ -380,3 +413,4 @@ animates `_progressController` over 1 second (linear), avoiding jumpy UI.
 | Date       | Change                                                                                              |
 |------------|-----------------------------------------------------------------------------------------------------|
 | 2026-07-29 | Initial `specs.md` documenting architecture, scheduling semantics, and the scheduled-timer bug fix. |
+| 2026-07-29 | Added Greeting Page feature: `greetings` table (schema v3), `SavedGreeting` model, `AddGreetingDialog`, `GreetingPage` (campus background, shimmering gradient title, live 12h Dhaka clock), and a "Greeting Pages" section on the home page. |
