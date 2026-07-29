@@ -62,26 +62,52 @@ class _TimerListPageState extends State<TimerListPage> {
 
   Future<void> _loadTimers() async {
     final dbTimers = await DatabaseHelper.instance.getAllTimers();
+    final List<SavedTimer> overdueScheduled = [];
+
     setState(() {
       _savedTimers.clear();
       for (var timerMap in dbTimers) {
         final timer = SavedTimer.fromMap(timerMap);
         timer.onScheduledStart = () => _onTimerScheduledStart(timer);
         _savedTimers.add(timer);
+
+        // Detect timers whose scheduled time has already passed while the
+        // app was closed — we'll re-run _scheduleTimer for them now that the
+        // onScheduledStart callback is wired up.
+        if (timer.scheduledTime != null &&
+            timer.wasScheduledStart &&
+            timer.scheduledTime!.isBefore(DateTime.now())) {
+          overdueScheduled.add(timer);
+        }
       }
       _isLoading = false;
+    });
+
+    // Re-run _scheduleTimer() for any scheduled timers that should have
+    // already fired while the app was closed. The SavedTimer constructor
+    // couldn't invoke onScheduledStart because the callback wasn't wired yet,
+    // so we trigger the schedule now — it will compute remaining time, call
+    // start(), and fire onScheduledStart → auto-routing to the running page.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (var timer in overdueScheduled) {
+        timer.rescheduleIfOverdue();
+      }
     });
   }
 
   void _onTimerScheduledStart(SavedTimer timer) {
-    if (mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => TimerRunningPage(savedTimer: timer),
-        ),
-      );
-    }
+    if (!mounted) return;
+
+    // Always push a fresh running page for this timer. The list page is the
+    // root route, so any TimerRunningPage stacked above it represents an
+    // active scheduled timer that the user should see ticking down.
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        settings: RouteSettings(name: 'timer-${timer.id}'),
+        builder: (context) => TimerRunningPage(savedTimer: timer),
+      ),
+    );
   }
 
   void _addTimer() {
@@ -301,8 +327,7 @@ class SavedTimer {
     final difference = scheduledTime!.difference(now);
 
     if (difference.isNegative) {
-      // Scheduled time has passed
-      isScheduled = false;
+      _handleOverdueSchedule(now);
       return;
     }
 
@@ -312,6 +337,51 @@ class SavedTimer {
       onScheduledStart?.call();
       start();
     });
+  }
+
+  /// Called after construction (once `onScheduledStart` is wired up) to
+  /// re-evaluate any scheduled timer whose trigger time has already passed.
+  /// Computes the remaining time, starts the countdown, and auto-routes to
+  /// the running screen via `onScheduledStart`.
+  void rescheduleIfOverdue() {
+    if (scheduledTime == null) return;
+    if (isRunning) return; // Already running, nothing to do.
+
+    final now = DateTime.now();
+    if (scheduledTime!.isAfter(now)) {
+      // Not overdue anymore — just rely on the normal _schedulerTimer.
+      return;
+    }
+
+    _handleOverdueSchedule(now);
+  }
+
+  void _handleOverdueSchedule(DateTime now) {
+    // Scheduled time has already passed (e.g. app was closed when trigger fired).
+    // Don't drop the timer — compute remaining seconds from how much of the
+    // duration has elapsed since the scheduled start, cap it to the full
+    // duration, and notify listeners so the running page can auto-launch.
+    final elapsedSinceStart = now.difference(scheduledTime!).inSeconds;
+    final recomputed = totalSeconds - elapsedSinceStart;
+
+    if (recomputed <= 0) {
+      // The whole timer has already expired — nothing left to run.
+      remainingSeconds = 0;
+      isScheduled = false;
+      _notifyListeners();
+      return;
+    }
+
+    // Some time still remains — clamp to total duration in case the timer
+    // was scheduled far in the past relative to its own length.
+    remainingSeconds = recomputed > totalSeconds ? totalSeconds : recomputed;
+    isScheduled = false;
+    _notifyListeners();
+
+    // Auto-launch the running screen (if a callback is wired up) and start
+    // the countdown with the recomputed remaining time.
+    onScheduledStart?.call();
+    start();
   }
 
   void addListener(VoidCallback listener) {
