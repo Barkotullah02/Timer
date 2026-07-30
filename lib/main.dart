@@ -1794,9 +1794,20 @@ class _GreetingPageState extends State<GreetingPage> with TickerProviderStateMix
                             position: _slideAnimation,
                             child: ScaleTransition(
                               scale: _scaleAnimation,
-                              child: _GradientTitle(
-                                text: title,
-                                fontSize: _titleFontSize(mediaQuery.size.width),
+                              child: Column(
+                                children: [
+                                  _GradientTitle(
+                                    text: "NORTH SOUTH UNIVERSITY",
+                                    fontSize: _titleFontSize(mediaQuery.size.width),
+                                  ),
+                                  const SizedBox(
+                                    height: 30,
+                                  ),
+                                  _GradientTitle(
+                                    text: title,
+                                    fontSize: 80,
+                                  ),
+                                ],
                               ),
                             ),
                           ),
